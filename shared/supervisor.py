@@ -355,6 +355,15 @@ class MDNS:
         self.zc = None
         self.info = None
         self._advertised_ip: str | None = None
+        # When running inside Docker on Windows, the native windows-mdns.exe
+        # handles mDNS on the real LAN.  The supervisor must NOT advertise
+        # the container's private 172.x IP, so all mDNS operations become
+        # harmless no-ops.
+        self._disabled = os.environ.get("DISABLE_SUPERVISOR_MDNS") == "true"
+        if self._disabled:
+            log("mDNS disabled (DISABLE_SUPERVISOR_MDNS) — "
+                "relying on external mDNS reflector")
+
 
     def start(self, prefer_target: str = None, wait: float = 30.0) -> str:
         """Advertise escapepod.local. Returns the IP actually published.
@@ -362,6 +371,10 @@ class MDNS:
         prefer_target is Vector's known LAN IP — passed to local_ip() so we
         probe routing to Vector directly and pick the interface that talks to
         him, regardless of whether Tailscale or another VPN is present."""
+        if self._disabled:
+            ip = local_ip(wait=wait, prefer_target=prefer_target)
+            self._advertised_ip = ip
+            return ip
         from zeroconf import IPVersion, ServiceInfo, Zeroconf
         ip = local_ip(wait=wait, prefer_target=prefer_target)
         self._advertised_ip = ip
@@ -380,6 +393,8 @@ class MDNS:
 
     def refresh(self, prefer_target: str = None, wait: float = 30.0) -> str:
         """Re-register with the current LAN IP — after sleep or IP change."""
+        if self._disabled:
+            return self.start(prefer_target=prefer_target, wait=wait)
         try:
             self.stop()
         except Exception:
@@ -397,6 +412,8 @@ class MDNS:
         restart" failure). Announcements in the PC->robot direction do get
         through, so re-announcing inside the TTL window keeps his cache
         permanently warm and removes the dependency on his queries entirely."""
+        if self._disabled:
+            return
         if self.zc and self.info:
             try:
                 self.zc.update_service(self.info)
@@ -405,6 +422,8 @@ class MDNS:
 
     def check_and_update(self, prefer_target: str = None) -> bool:
         """Re-advertise if the LAN IP has drifted. Returns True if refreshed."""
+        if self._disabled:
+            return False
         current = _detect_local_ip(prefer_target)
         if current and current != self._advertised_ip:
             log(f"mDNS: IP drift {self._advertised_ip} -> {current} — re-advertising")

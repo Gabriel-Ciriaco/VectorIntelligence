@@ -227,6 +227,61 @@ bash apply-wirepod-config.sh         # apply the AI config
 # pair Vector via the Robots tab
 ```
 
+### Docker (Windows & Linux)
+
+You can run the entire stack (Wire-Pod, vector-ai, and Ollama) using Docker via the included `docker-compose.yml`. 
+
+#### Windows Setup (Docker Desktop)
+The most reliable way to run this stack on Windows is using **Docker Desktop** with the WSL2 backend.
+
+**Important:** Docker on Windows (WSL2) cannot forward mDNS multicast traffic
+to the physical LAN. The build automatically cross-compiles a tiny
+`windows-mdns.exe` that runs natively on Windows and bridges this gap — Vector
+discovers the server through it.
+
+1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) (ensure the WSL2 backend is selected).
+2. Build and start:
+   ```bash
+   docker compose build
+   docker compose up -d
+   ```
+3. On the **very first start**, the container exports `windows-mdns.exe` into
+   your `./vector-data/` folder. Run it (double-click or from a terminal):
+   ```powershell
+   .\vector-data\windows-mdns.exe
+   ```
+   Keep this window open — it advertises `escapepod.local` on your LAN so
+   Vector can find the Docker container. It also auto-detects Vector's IP
+   changes and updates `botSdkInfo.json`.
+4. **Initial Bot Setup & Authentication Note (Windows Docker):**
+   Performing initial bot pairing and authentication wizard directly through the web UI in Docker Desktop on Windows has known limitations. The recommended onboarding path on Windows is:
+   - Download the official native [Wire-Pod for Windows](https://github.com/kercre123/wire-pod).
+   - Run native Wire-Pod once to complete initial setup and authenticate/pair Vector.
+   - Copy the generated folders `session-certs`, `certs`, and `jdocs` from `C:\Users\<your-user>\AppData\Roaming\wire-pod` directly into the `./vector-data/` folder of this Docker project.
+5. **Cleaning Windows Firewall Rules (Optional):**
+   On first execution, `windows-mdns.exe` prompts for Windows Defender Firewall permission so it can answer mDNS queries on UDP 5353. If you ever uninstall the project and want to clean up those firewall rules, run the provided script in PowerShell (as Administrator):
+   ```powershell
+   .\shared\scripts\remove-windows-mdns-rule.ps1
+   ```
+   Or execute: `Remove-NetFirewallRule -DisplayName "windows-mdns"`
+
+#### Linux Setup
+On Linux, Docker can access the host network directly — no mDNS reflector binary needed.
+1. In `docker-compose.yml`, uncomment `network_mode: "host"` and comment out the `ports:` block.
+2. In host network mode, Docker shares the host's physical network adapter (`eth0`/`wlan0`) directly. The internal `zeroconf` service inside the container advertises `escapepod.local` across your physical LAN natively.
+3. Ensure the NVIDIA Container Toolkit is installed so Docker can access your GPU:
+   - [Official NVIDIA Container Toolkit install guide](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
+
+#### Customizing the Whisper Speech Model
+By default, the Docker image builds with the English base model (`base.en`). You can change the model size (e.g. `tiny.en`, `base.en`, `small.en`, `medium.en`) when building or running Docker:
+
+- Pass `WHISPER_MODEL` when building or running `docker compose`:
+  ```bash
+  WHISPER_MODEL=small.en docker compose build --no-cache
+  WHISPER_MODEL=small.en docker compose up -d
+  ```
+
+
 ---
 
 ## Daily operation

@@ -23,11 +23,13 @@
     "temp": 1.2
   },
   "STT": {
-    "provider": "vosk",
+    "provider": "whisper.cpp",
     "language": "en-US"
   },
   "server": {
-    "epconfig": true,
+    "epconfig": false,
     "port": "443"
-  }
+  },
+  "hasreadfromenv": false,
+  "pastinitialsetup": true
 }

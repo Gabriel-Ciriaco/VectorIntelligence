@@ -28,3 +28,7 @@ VectorSnapshots/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# ---Docker Configs and Volumes ---
+vector-data/
+
